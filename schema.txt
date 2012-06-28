@@ -1,0 +1,12 @@
+package/
+├── stable
+│   ├── SOURCES
+│   │   └── package-1.0.tar.gz
+│   └── SPECS
+│       └── package.spec
+└── testing
+    ├── SOURCES
+    │   └── package-1.0.tar.gz
+    └── SPECS
+        └── package.spec
+

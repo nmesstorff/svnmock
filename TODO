@@ -1,0 +1,3 @@
+ - change schema to package/repo insted of repo/package
+ - catch mock error messages
+ - usage of mock --enable-scm ?
