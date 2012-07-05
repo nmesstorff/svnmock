@@ -1,18 +1,14 @@
 #!/bin/bash
 #set -x
-# Startup check
+shopt -s nullglob
+
+# default values
 REPO="$1"
 REV=$2
-RESULTDIR="/data/result"
-
-if [ -z "${REPO}" ]; then
-	REPO=/Users/normes/svn/mocktest.svn/
-	REV=22
-fi
 REPO="${REPO}/"
 TMPDIR=${REPO}tmp
+RESULTDIR="/data/result"
 
-shopt -s nullglob
 
 #
 # local basic functions
@@ -30,12 +26,12 @@ function die {
 
 
 #
-# prepare envireonment
+# prepare environment
 #
 log starting "$REPO" "$REV"
-
-mkdir -p ${TMPDIR} ${RESULTDIR}
+mkdir -p ${TMPDIR}
 cd ${TMPDIR} || "Could not cd into ${TMPDIR}"
+
 # prevent us to NOT delete the whole hdd :)
 if [ ${#TMPDIR} -gt 5 ]; then
 	rm -rf ${TMPDIR}/*
@@ -44,65 +40,76 @@ else
 fi
 
 
-# 
-# check changed repos
 #
-REPOS=()
-for repository in `svnlook dirs-changed --revision ${REV} "${REPO}"`; do
-	currentrepo=${repository%%/*}
+# check changed packages
+#
+BUILD=()
+for package in `svnlook dirs-changed --revision ${REV} "${REPO}"`; do
+	# package
+	currentpkg=${package%%/*}
 	
-	# check duplicate values
-	duplicated=false
-	for dup in ${REPOS[@]}; do
-		if [ "${dup}" == "${currentrepo}" ]; then
-			duplicated=true
-			break;
-		else
+	# repo
+	currentrepo=${package##$currentpkg/}
+	currentrepo=${currentrepo%%/*}
+	
+	# buildlist
+	if [ -z "${BUILD}" ]; then
+		BUILD=("${currentpkg}/${currentrepo}")
+	fi
+	
+	for dup in ${BUILD[@]}; do
+		if [ "${dup}" == "${currentpkg}/${currentrepo}" ]; then
 			continue;
+		else
+			BUILD=("${BUILD[@]}" "${currentpkg}/${currentrepo}")
+			break;
 		fi
 	done
-	
-	# add value to array
-	if [ $duplicated == false ]; then
-		log " * repo changed: '${currentrepo}'"
-		REPOS=("${REPOS[@]}" "${currentrepo}")
-	fi
 done
+log " * changed packages: ${BUILD[@]}"
 
 
 #
-# working thru changed packages in all repos
+# build changed packages
 #
-for repository in ${REPOS[@]}; do
-	#
-	# changed packages
-	#
-	PACKAGES=()
-	for package in `svnlook dirs-changed --revision ${REV} "${REPO}"`; do
-		currentpkg=${package##$repository/}
-		currentpkg=${currentpkg%%/*}
-				
-		log " * package changed: '${repository}/${currentpkg}'"
-		PACKAGES=("${PACKAGES[@]}" "${currentpkg}")
-	done
+for target in ${BUILD[@]}; do
+	log "*-* build target: $target"
+	pkgname=${target%%/*}
+	reponame=${target##$pkgname/}
+	logprefix="${pkgname}_${reponame}_r${REV}_"
 	
-	#
 	# svn export into TMPDIR
-	#
-	echo ${PACKAGES}
-	for package in ${PACKAGES[@]}; do
-		svn export -r $REV file:///"$REPO""${repository}/""${package}"/ --force
-		mkdir -p "${package}"/{RPMS,SRPMS}
-		log "  . building SRPM '${repository}/${package}'"
-		mock --resultdir="${package}"/SRPMS/ --buildsrpm --spec "${package}"/SPECS/"${package}".spec --source "${package}"/SOURCES/
-		RET=$?
-		log "  . [DONE=${RET}] building SRPM '${repository}/${package}'"
-		log "  . building binary RPM '${repository}/${package}'"
-		mock --resultdir="${package}"/RPMS/  --rebuild "${package}"/SRPMS/*.src.rpm
-		RET=$?
-		log "  . [DONE=${RET}] building binary RPM '${repository}/${package}'"
-		mv "${package}"/{RPMS,SRPMS} ${RESULTDIR}
-	done
+	mkdir -p "${target}"/{RPMS,SRPMS,LOGS}
+	svn export -r $REV file:///"$REPO""${target}"/ ${target}  --force &> ${target}/LOGS/${logprefix}svn_export.log
+
+	# building SRPM with mock	
+	log "  . building SRPM '${target}'"
+	mock --resultdir="${target}"/SRPMS/ --buildsrpm --spec "${target}"/SPECS/"${pkgname}".spec --source "${target}"/SOURCES/ &> ${target}/LOGS/${logprefix}mock_srpm.log
+	RET=$?
+	log "  . [DONE=${RET}] building SRPM '${target}' in ${TMPDIR}"
+	if [ ${RET} != 0 ]; then
+		die "Could not build '${target}'"
+	fi
+	
+	# building RPM with mock
+	log "  . building binary RPM '${target}'"
+	mock --resultdir="${target}"/RPMS/  --rebuild "${target}"/SRPMS/*.src.rpm &> ${target}/LOGS/${logprefix}mock_rpm.log
+	RET=$?
+	log "  . [DONE=${RET}] building binary RPM '${target}' in ${TMPDIR}"
+	if [ ${RET} != 0 ]; then
+		die "Could not build '${target}'"
+	fi
+	
+	# move stuff into RESULTDIR
+	mkdir -p ${RESULTDIR}/${reponame}/{LOGS,SRPMS,RPMS}
+	mv ${target}/LOGS/* ${RESULTDIR}/${reponame}/LOGS/
+	mv ${target}/SRPMS/*.rpm ${RESULTDIR}/${reponame}/SRPMS/
+	mv ${target}/RPMS/*.rpm	${RESULTDIR}/${reponame}/RPMS/
 done
+
+# running post-hook (createrepo...)
+if [ -x ${RESULTDIR}/post.sh ]; then
+	${RESULTDIR}/post.sh ${reponame}
+fi
 
 exit $?
