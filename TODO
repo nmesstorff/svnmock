@@ -1,2 +1,7 @@
  - catch mock error messages
  - usage of mock --enable-scm ?
+
+ - provide buildlogs and buildstate via some webpage
+ - eMail build status to address in latest changelog entry
+ - rpmlint after RPM build
+ - don't run mock directly, tell a buildserver to do the work.
