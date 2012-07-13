@@ -53,19 +53,27 @@ for package in `svnlook dirs-changed --revision ${REV} "${REPO}"`; do
 	currentrepo=${currentrepo%%/*}
 	
 	# buildlist
-	if [ -z "${BUILD}" ]; then
-		BUILD=("${currentpkg}/${currentrepo}")
-	fi
-	
-	for dup in ${BUILD[@]}; do
-		if [ "${dup}" == "${currentpkg}/${currentrepo}" ]; then
-			continue;
-		else
-			BUILD=("${BUILD[@]}" "${currentpkg}/${currentrepo}")
-			break;
+	if [ ! -z ${currentrepo} ]; then
+		if [ -z "${BUILD}" ]; then
+			BUILD=("${currentpkg}/${currentrepo}")
 		fi
-	done
+		
+		for dup in ${BUILD[@]}; do
+			if [ "${dup}" == "${currentpkg}/${currentrepo}" ]; then
+				continue;
+			else
+				BUILD=("${BUILD[@]}" "${currentpkg}/${currentrepo}")
+				break;
+			fi
+		done
+	fi
 done
+
+if [ -z "${BUILD[@]}" ]; then
+        log " * no changed packages."
+        exit 0
+fi
+
 log " * changed packages: ${BUILD[@]}"
 
 
