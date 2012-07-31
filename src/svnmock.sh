@@ -231,7 +231,7 @@ done
 #
 if [ -x ${RESULTDIR}/post.sh ]; then
 	log "  . running post.sh"
-	${RESULTDIR}/post.sh ${reponame} &> ${RESULTDIR}/${logprefix}post.log
+	${RESULTDIR}/post.sh ${reponame} &> ${RESULTDIR}/post.log
 	RET=$?
 	log "  . [DONE=${RET}] post.sh"
 fi
