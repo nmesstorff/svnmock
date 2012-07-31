@@ -17,7 +17,6 @@ Simply create a directory for each RPM package with SPECS and SOURCES subdirs as
   <code>
 RESULTDIR="/opt/svnmock/result"
 MOCKCONFDIR="/etc/mock"
-
 BASEURL="http://$(hostname --fqdn)/svnmock"	
   </code>
  * (maybe) modify your local mock configuration
