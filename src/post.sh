@@ -1,11 +1,19 @@
 #!/bin/bash
+set -e
 
+#
+# local basic functions
+#
+function die {
+        logger -s -t "$0" "ERROR: $@"
+        echo "$@"
+        exit 1
+}
+
+# default values
 MYDIR=${0%%/post.sh}
-REPONAME=$1
 
-if [ -z "${REPONAME}" ]; then
-	echo "Usage: $0 [REPONAME]"
-	exit 1
-fi
+. /etc/svnmock.conf || die "ERROR: /etc/svnmock.conf not existing!"
 
-createrepo -v --database --update "${MYDIR}/${REPONAME}/RPMS" &> ${MYDIR}/${REPONAME}/LOGS/createrepo.log
+
+time rsync -av --delete-after --delay-updates -e ssh --progress --stats ${RESULTDIR}/ ${RSYNC_DEST}
